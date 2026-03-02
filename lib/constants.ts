@@ -2,7 +2,7 @@ import type { AssetId, AssetMeta, Period, RollingWindow, NewsCategory } from './
 
 export const ASSET_META: Record<AssetId, AssetMeta> = {
   BTC: {
-    id: 'BTC', symbol: 'BTC-USD', tvSymbol: 'BINANCE:BTCUSDT',
+    id: 'BTC', symbol: 'BTC-USD', tvSymbol: 'COINBASE:BTCUSD',
     nameKo: '비트코인', unit: 'USD', decimals: 0, color: '#f7931a',
   },
   SPY: {
@@ -10,11 +10,11 @@ export const ASSET_META: Record<AssetId, AssetMeta> = {
     nameKo: 'S&P 500 (SPY)', unit: 'USD', decimals: 2, color: '#00d4ff',
   },
   KOSPI: {
-    id: 'KOSPI', symbol: '^KS11', tvSymbol: 'INDEX:KOSPI',
+    id: 'KOSPI', symbol: '^KS11', tvSymbol: 'KRX:KOSPI',
     nameKo: '코스피', unit: 'KRW', decimals: 0, color: '#00ff88',
   },
   USDKRW: {
-    id: 'USDKRW', symbol: 'USDKRW=X', tvSymbol: 'FX_IDC:USDKRW',
+    id: 'USDKRW', symbol: 'USDKRW=X', tvSymbol: 'FX:USDKRW',
     nameKo: '달러/원 환율', unit: 'KRW', decimals: 1, color: '#ffb800',
   },
   TNX: {
@@ -22,7 +22,7 @@ export const ASSET_META: Record<AssetId, AssetMeta> = {
     nameKo: '미국 10년 국채금리', unit: '%', decimals: 2, color: '#b48eff',
   },
   GOLD: {
-    id: 'GOLD', symbol: 'GC=F', tvSymbol: 'COMEX:GC1!',
+    id: 'GOLD', symbol: 'GC=F', tvSymbol: 'TVC:GOLD',
     nameKo: '금 (Gold)', unit: 'USD', decimals: 1, color: '#ffd700',
   },
 };
@@ -51,16 +51,14 @@ export const PERIOD_RANGE_MAP: Record<Period, string> = {
 
 export const REFRESH_INTERVAL_MS = 60_000;
 
-// ─── News categories ────────────────────────────────────────────────────────
 export const NEWS_CATEGORIES: Array<{ id: NewsCategory; labelKo: string; emoji: string }> = [
-  { id: 'crypto',    labelKo: '암호화폐',        emoji: '₿' },
-  { id: 'us_market', labelKo: '미국 증시',        emoji: '🇺🇸' },
-  { id: 'kr_market', labelKo: '한국 증시',        emoji: '🇰🇷' },
-  { id: 'fx_macro',  labelKo: '환율·거시경제',   emoji: '💱' },
-  { id: 'commodity', labelKo: '원자재',           emoji: '🥇' },
+  { id: 'crypto',    labelKo: '암호화폐',      emoji: '₿' },
+  { id: 'us_market', labelKo: '미국 증시',      emoji: '🇺🇸' },
+  { id: 'kr_market', labelKo: '한국 증시',      emoji: '🇰🇷' },
+  { id: 'fx_macro',  labelKo: '환율·거시경제', emoji: '💱' },
+  { id: 'commodity', labelKo: '원자재',         emoji: '🥇' },
 ];
 
-// ─── VSA Config ─────────────────────────────────────────────────────────────
 export const VSA_CONFIG = {
   RSI_PERIOD: 14,
   RSI_OVERSOLD_STRONG: 30,

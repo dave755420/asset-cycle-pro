@@ -9,18 +9,20 @@ import { DataTable } from './DataTable';
 import { PriceChart } from './PriceChart';
 import { TradingViewChart } from './TradingViewChart';
 import { VSASignalPanel } from './VSASignalPanel';
+import { SP500ScanPanel } from './SP500ScanPanel';
 import { NewsPanel } from './NewsPanel';
 import { useQuotes, useCorrelation } from '@/hooks/useAssetData';
 import { formatDatetime } from '@/lib/utils';
 import { ASSET_IDS, ASSET_META } from '@/lib/constants';
 import type { AssetId, Period, RollingWindow } from '@/lib/types';
 
-type TabId = 'overview' | 'tradingview' | 'vsa' | 'correlation' | 'news' | 'table';
+type TabId = 'overview' | 'tradingview' | 'vsa' | 'sp500scan' | 'correlation' | 'news' | 'table';
 
 const TABS: Array<{ id: TabId; label: string; emoji: string }> = [
   { id: 'overview',     label: '개요',        emoji: '◈' },
   { id: 'tradingview',  label: 'TV 차트',     emoji: '📊' },
   { id: 'vsa',          label: 'VSA 분석',    emoji: '⚡' },
+  { id: 'sp500scan',    label: 'S&P 스캔',    emoji: '🔍' },
   { id: 'correlation',  label: '상관관계',    emoji: '🔗' },
   { id: 'news',         label: '뉴스',        emoji: '📰' },
   { id: 'table',        label: '데이터',      emoji: '≡' },
@@ -322,6 +324,16 @@ export function Dashboard() {
             <div className="animate-fadeIn">
               <section className="bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
                 <NewsPanel />
+              </section>
+            </div>
+          )}
+
+
+          {/* ═══ S&P 500 VSA SCAN ════════════════════════════════════ */}
+          {activeTab === 'sp500scan' && (
+            <div className="animate-fadeIn">
+              <section className="bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
+                <SP500ScanPanel />
               </section>
             </div>
           )}
