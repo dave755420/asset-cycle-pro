@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0e1a;
+  --panel: #0f1628;
+  --border: #1e2d4a;
+  --accent: #00d4ff;
+  --green: #00ff88;
+  --amber: #ffb800;
+  --red: #ff4466;
+  --purple: #b48eff;
+  --muted: #4a6080;
+  --text: #c8d8f0;
+  --heading: #e8f0ff;
+
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+  --font-sans: 'Noto Sans KR', 'Space Grotesk', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Grid overlay background */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Glow effects */
+.glow-accent { box-shadow: 0 0 20px rgba(0, 212, 255, 0.15); }
+.glow-green { box-shadow: 0 0 20px rgba(0, 255, 136, 0.12); }
+.glow-amber { box-shadow: 0 0 20px rgba(255, 184, 0, 0.12); }
+
+/* Animated border */
+@keyframes borderPulse {
+  0%, 100% { border-color: rgba(0, 212, 255, 0.3); }
+  50% { border-color: rgba(0, 212, 255, 0.7); }
+}
+
+.border-pulse { animation: borderPulse 2s ease infinite; }
+
+/* Scan line effect */
+.scanline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn { animation: fadeIn 0.4s ease forwards; }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-blink { animation: blink 1s step-end infinite; }
+
+/* Number font */
+.font-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
