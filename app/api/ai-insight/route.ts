@@ -1,16 +1,16 @@
 /**
  * app/api/ai-insight/route.ts
- * Claude API를 이용한 AI 시장 분석
- * 환경변수: ANTHROPIC_API_KEY (Vercel에 설정)
+ * Google Gemini API를 이용한 AI 시장 분석 (무료)
+ * 환경변수: GEMINI_API_KEY (Vercel에 설정)
  */
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.' }, { status: 500 });
+    return NextResponse.json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다.' }, { status: 500 });
   }
 
   try {
@@ -20,9 +20,8 @@ export async function POST(req: NextRequest) {
     let prompt = '';
 
     if (mode === 'market') {
-      // 현재 시장 상황 분석
       const quotes = data?.quotes ?? [];
-      const quoteText = quotes.map((q: { nameKo: string; price: number; changePct: number; }) =>
+      const quoteText = quotes.map((q: { nameKo: string; price: number; changePct: number }) =>
         `${q.nameKo}: ${q.price} (${q.changePct >= 0 ? '+' : ''}${q.changePct?.toFixed(2)}%)`
       ).join('\n');
       prompt = `당신은 한국의 기관 투자자를 위한 금융 분석 전문가입니다.
@@ -38,7 +37,6 @@ ${quoteText}
 분석은 객관적 사실 기반으로, 투기적 예측보다는 현황 해석에 집중하세요.`;
 
     } else if (mode === 'backtest') {
-      // 백테스트 결과 해석
       const bt = data?.result;
       prompt = `당신은 퀀트 투자 전략 분석 전문가입니다.
 
@@ -58,7 +56,6 @@ ${quoteText}
 3. 개선 방향 1가지 제안`;
 
     } else if (mode === 'news') {
-      // 뉴스 요약 + 시장 영향 분석
       const headlines = (data?.headlines ?? []).slice(0, 8).join('\n');
       prompt = `당신은 글로벌 금융 뉴스 분석 전문가입니다.
 
@@ -70,30 +67,34 @@ ${headlines}
 2. 한국 투자자 관점에서의 시사점`;
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Gemini API 호출
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+        },
       }),
       signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('[AI Insight] Claude API 오류:', errText);
-      return NextResponse.json({ error: 'Claude API 호출 실패' }, { status: 500 });
+      console.error('[AI Insight] Gemini API 오류:', errText);
+      return NextResponse.json({ error: 'Gemini API 호출 실패' }, { status: 500 });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await response.json() as any;
-    const text: string = result?.content?.[0]?.text ?? '';
+    const text: string = result?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+    if (!text) {
+      return NextResponse.json({ error: '응답 없음 — 잠시 후 다시 시도하세요' }, { status: 500 });
+    }
 
     return NextResponse.json({ analysis: text, mode, generatedAt: new Date().toISOString() });
 
