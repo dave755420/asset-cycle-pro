@@ -171,7 +171,7 @@ export function Dashboard() {
                   {[
                     { tab: 'portfolio' as TabId, emoji: '💼', title: '포트폴리오', desc: '보유 자산 실시간 손익', color: '#00ff88' },
                     { tab: 'alerts'    as TabId, emoji: '🔔', title: '알림 시스템', desc: '조건 충족 시 자동 알림', color: '#ffb800' },
-                    { tab: 'ai'        as TabId, emoji: '🤖', title: 'AI 분석',    desc: 'Claude 시장 인사이트',  color: '#b48eff' },
+                    { tab: 'ai'        as TabId, emoji: '🏠', title: '부동산(개발중)',    desc: 'Claude 시장 인사이트',  color: '#b48eff' },
                   ].map(item => (
                     <div key={item.tab} onClick={() => setActiveTab(item.tab)}
                       className="p-3 rounded-lg bg-[#0a0e1a] border border-[#1e2d4a] cursor-pointer hover:border-[#2a3d5a] transition-colors">

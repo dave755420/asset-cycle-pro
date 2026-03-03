@@ -1,248 +1,109 @@
 /**
  * app/api/ai-insight/route.ts
+ * 오늘의 뉴스 카테고리별 AI 요약
  */
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+const CATEGORIES = [
+  { id: 'crypto',    label: '비트코인 & 암호화폐', emoji: '🟠' },
+  { id: 'us_market', label: '나스닥 & 미국 증시',  emoji: '🟦' },
+  { id: 'kr_market', label: '코스피 & 한국 증시',  emoji: '🟩' },
+  { id: 'commodity', label: '금 & 원자재',          emoji: '🟤' },
+  { id: 'fx_macro',  label: '달러 & 환율',          emoji: '💵' },
+];
+
+async function fetchNewsByCategory(category: string, baseUrl: string): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `${baseUrl}/api/news?category=${category}`,
+      { cache: 'no-store', signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json = await res.json() as any;
+    const feed = json?.feeds?.[0];
+    if (!feed) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (feed.items ?? []).slice(0, 5).map((item: any) => item.title as string).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function summarizeWithGemini(apiKey: string, categoryLabel: string, headlines: string[]): Promise<string> {
+  if (headlines.length === 0) return '현재 관련 뉴스를 불러올 수 없습니다.';
+
+  const headlineText = headlines.map((h, i) => `${i + 1}. ${h}`).join('\n');
+
+  const prompt = `당신은 금융 뉴스 요약 전문가입니다.
+아래는 오늘의 [${categoryLabel}] 관련 최신 뉴스 헤드라인입니다.
+
+${headlineText}
+
+위 헤드라인에 나온 내용만 기반으로 아래 형식에 맞게 작성하세요. 없는 내용을 추가하지 마세요.
+
+**핵심 요약**
+오늘의 주요 흐름을 3~4문장으로 요약.
+
+**투자 관점**
+투자자에게 시사하는 점을 1~2문장으로.
+
+**주의 리스크**
+가장 주의할 리스크 1가지를 한 문장으로.`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!response.ok) throw new Error(`Gemini API 오류: ${response.status}`);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await response.json() as any;
+  return result?.candidates?.[0]?.content?.parts?.[0]?.text ?? '요약 생성 실패';
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다.' }, { status: 500 });
+    return NextResponse.json({ error: 'GEMINI_API_KEY가 설정되지 않았습니다.' }, { status: 500 });
   }
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000';
 
   try {
     const body = await req.json();
-    const { mode, data } = body;
-
-    let prompt = '';
-
-    if (mode === 'market') {
-      const quotes = data?.quotes ?? [];
-      const quoteText = quotes.map((q: { nameKo: string; price: number; changePct: number }) =>
-        `${q.nameKo}: ${q.price} (${q.changePct >= 0 ? '+' : ''}${q.changePct?.toFixed(2)}%)`
-      ).join('\n');
-      prompt = `당신은 글로벌 자산 사이클 전략을 전문으로 하는 세계 최고 수준의 멀티에셋 포트폴리오 매니저입니다.
-비트코인, 나스닥, S&P500, 코스피, 채권, 금, 달러 등 모든 자산군의 사이클을 종합 분석하여 현재 어떤 자산에 투자하는 것이 가장 유리한지 명확하게 판단해주세요.
-
-현재 주요 자산 시세:
-${quoteText}
-
-아래 각 섹션을 빠짐없이, 각 항목당 최소 300자 이상, 전체 4000자 이상으로 상세하게 작성하세요.
-
----
-
-## 📊 1. 현재 글로벌 자산 사이클 위치 진단
-지금이 경기 사이클의 어느 단계(회복기 / 확장기 / 과열기 / 침체기)인지 판단하고, 각 자산군(주식, 채권, 원자재, 암호화폐, 현금)이 사이클상 어디에 위치하는지 상세히 설명하세요.
-현재 시세 데이터에서 읽히는 자금 흐름 방향(Risk-On / Risk-Off)을 분석하고, 그 강도와 지속 가능성을 평가하세요.
-
----
-
-## 📈 2. 자산군별 상세 사이클 분석
-
-### 🟠 비트코인 & 암호화폐
-비트코인의 현재 가격 위치가 강세장 / 약세장 / 횡보 중 어디인지 판단하세요.
-4년 반감기 사이클 관점에서 현재가 어느 단계인지, 역사적 패턴과 비교하여 향후 방향성을 분석하세요.
-기관 자금 유입 여부, 매크로 환경과의 상관관계를 설명하세요.
-
-### 🟦 미국 주식 (나스닥 / S&P500)
-현재 미국 증시의 밸류에이션 수준과 기술적 위치를 분석하세요.
-AI·기술주 중심의 나스닥과 전통 산업 중심 S&P500의 상대 강도 차이를 분석하세요.
-미국 금리 방향성, 달러 강약과의 연동 관계를 설명하세요.
-
-### 🟩 한국 주식 (코스피)
-코스피가 글로벌 증시 대비 아웃퍼폼/언더퍼폼하고 있는지, 그 원인을 분석하세요.
-반도체·자동차·배터리 등 주요 섹터의 글로벌 수요 사이클과 연결하여 설명하세요.
-외국인 수급 흐름과 원/달러 환율이 코스피에 미치는 영향을 분석하세요.
-
-### 🟡 채권 (미국 10년물 국채)
-현재 금리 수준이 역사적으로 높은지 낮은지 평가하고, 향후 금리 방향성(인하/동결/인상)을 분석하세요.
-채권 가격과 주식 시장의 상관관계가 현재 어떻게 작동하고 있는지 설명하세요.
-채권이 현재 포트폴리오에서 안전자산 역할을 할 수 있는지 평가하세요.
-
-### 🟤 금 (Gold)
-금의 현재 가격이 사이클상 어디에 있는지 분석하세요.
-달러 인덱스, 실질금리, 지정학적 리스크와 금 가격의 관계를 설명하세요.
-인플레이션 헤지 수단으로서 금의 현재 매력도를 평가하세요.
-
-### 💵 달러 & 원/달러 환율
-달러 강세/약세 사이클이 현재 어느 단계인지 분석하세요.
-달러 방향성이 각 자산군(신흥국 주식, 금, 원자재, 암호화폐)에 미치는 연쇄 영향을 분석하세요.
-
----
-
-## 🏆 3. 현재 시점 자산별 투자 매력도 랭킹
-지금 당장 투자하기 가장 유리한 자산부터 순위를 매기고, 각 자산에 대해 왜 유리한지 또는 불리한지 구체적인 근거와 함께 설명하세요.
-
-1위: (자산명) - 근거 상세 설명
-2위: (자산명) - 근거 상세 설명
-3위: (자산명) - 근거 상세 설명
-4위: (자산명) - 근거 상세 설명
-5위: (자산명) - 근거 상세 설명
-6위: (자산명) - 근거 상세 설명
-
----
-
-## 💼 4. 사이클 기반 포트폴리오 전략 제안
-현재 자산 사이클을 고려한 이상적인 포트폴리오 비중을 제안하세요.
-
-- 공격형 투자자 (고수익 추구, 고위험 감수): 각 자산별 비중 %와 근거
-- 균형형 투자자 (수익과 안정의 균형): 각 자산별 비중 %와 근거
-- 방어형 투자자 (자산 보호 우선): 각 자산별 비중 %와 근거
-
----
-
-## ⚠️ 5. 현재 사이클에서 가장 주의해야 할 리스크
-현재 시장에서 사이클 전환을 촉발할 수 있는 주요 리스크 요인 4가지 이상을 구체적으로 분석하세요.
-각 리스크의 발현 가능성(높음/중간/낮음)과 시장 충격 강도를 평가하세요.
-해당 리스크가 현실화될 경우 어떤 자산이 가장 큰 타격을 받고, 어떤 자산이 안전지대가 되는지 설명하세요.
-
----
-
-## 🔮 6. 향후 3~6개월 사이클 전망 및 시나리오
-- 강세 시나리오 (확률 추정 포함): 조건과 예상 흐름
-- 기본 시나리오 (확률 추정 포함): 조건과 예상 흐름
-- 약세 시나리오 (확률 추정 포함): 조건과 예상 흐름
-
-투자자가 사이클 전환 신호를 미리 감지하기 위해 매주 체크해야 할 핵심 지표 5가지를 제시하세요.
-
-모든 분석은 현재 제공된 시세 데이터를 기반으로 하되, 레이 달리오의 올웨더 이론 등 글로벌 자산 사이클 이론을 참조하여 전문적이고 실용적인 인사이트를 제공하세요.`;
-
-    } else if (mode === 'backtest') {
-      const bt = data?.result;
-      prompt = `당신은 퀀트 투자 전략 및 글로벌 자산 사이클 분석을 전문으로 하는 세계적 수준의 헤지펀드 매니저입니다.
-
-백테스트 결과:
-- 전략: ${bt?.strategyId}
-- 총 수익률: ${bt?.totalReturn}%
-- CAGR: ${bt?.cagr}%
-- 샤프지수: ${bt?.sharpe}
-- 최대 낙폭(MDD): ${bt?.maxDrawdown}%
-- 승률: ${bt?.winRate}%
-- 손익비: ${bt?.profitFactor}
-- 거래 횟수: ${bt?.numTrades}회
-
-아래 각 섹션을 빠짐없이, 각 항목당 최소 300자 이상, 전체 4000자 이상으로 상세하게 작성하세요.
-
----
-
-## 📊 1. 전략 성과 종합 등급 평가
-버크셔 헤서웨이, 르네상스 테크놀로지, S&P500 Buy&Hold 등 벤치마크와 비교하여 S~F 등급으로 평가하고 상세히 설명하세요.
-
-## 📈 2. 전략의 핵심 강점 분석
-데이터 기반으로 3가지 이상 구체적으로 설명하세요.
-
-## ⚠️ 3. 전략의 취약점 및 숨겨진 리스크
-과적합(Overfitting) 가능성, 실전 괴리(슬리피지, 유동성)를 솔직하게 분석하세요.
-
-## 🔄 4. 자산 사이클별 전략 성과 예측
-강세장, 약세장, 횡보장, 비트코인 강세장, 나스닥 폭락장 등 각 환경에서의 예상 성과를 분석하세요.
-
-## 💼 5. 실전 운용 완전 가이드
-포지션 사이징, 손절/익절 기준, 거래비용 최적화, MDD 구간 심리 관리를 상세히 안내하세요.
-
-## 🔧 6. 전략 개선 로드맵
-개선 방안 4가지 이상과 각각 어떤 지표를 얼마나 개선할지 설명하세요.
-
-## 🏆 7. 최종 투자 적합성 판정
-지금 실전 사용 가능/보완 후 사용/전면 재설계 중 명확하게 판정하고, 어떤 투자자 유형에 가장 적합한지 결론 내리세요.`;
-
-    } else if (mode === 'news') {
-      const headlines = (data?.headlines ?? []).slice(0, 8).join('\n');
-      prompt = `당신은 글로벌 자산 사이클과 금융 뉴스 영향 분석을 전문으로 하는 세계적 수준의 매크로 전략가입니다.
-오늘의 뉴스가 비트코인, 나스닥, 코스피, 채권, 금, 달러 등 각 자산 사이클에 어떤 영향을 미치는지 분석하고, 지금 어떤 자산에 투자하는 것이 유리한지 명확하게 판단해주세요.
-
-최신 금융 뉴스 헤드라인:
-${headlines}
-
-아래 각 섹션을 빠짐없이, 각 항목당 최소 300자 이상, 전체 4000자 이상으로 상세하게 작성하세요.
-
----
-
-## 📰 1. 오늘의 핵심 뉴스 심층 분석
-각 헤드라인의 배경, 원인, 시장 함의를 개별적으로 심층 분석하고 자산 사이클 관점의 해석을 제공하세요.
-
----
-
-## 🔄 2. 자산별 사이클 영향 분석
-
-### 🟠 비트코인 & 암호화폐
-오늘 뉴스가 비트코인 사이클에 미치는 영향, 리스크온/오프 심리와의 연관성을 분석하세요.
-
-### 🟦 나스닥 & 미국 기술주
-오늘 뉴스가 나스닥과 AI·반도체·빅테크 섹터에 미치는 구체적인 영향을 분석하세요.
-
-### 🟩 코스피 & 한국 시장
-오늘 뉴스가 코스피, 반도체, 자동차, 배터리 섹터에 미치는 영향과 외국인 수급 변화 가능성을 분석하세요.
-
-### 🟡 채권 & 금리
-오늘 뉴스가 미국·한국 국채 금리와 연준 정책 방향성에 미치는 영향을 분석하세요.
-
-### 🟤 금 & 원자재
-오늘 뉴스가 금, 원유, 구리 등 원자재 사이클에 미치는 영향을 분석하세요.
-
-### 💵 달러 & 환율
-오늘 뉴스가 달러 인덱스와 원화, 엔화, 유로화 환율에 미치는 영향을 분석하세요.
-
----
-
-## 🏆 3. 오늘 뉴스 기준 자산 투자 매력도 랭킹
-지금 투자하기 가장 유리한 자산부터 순위를 매기고 구체적인 근거를 설명하세요.
-
-1위: (자산명) - 근거
-2위: (자산명) - 근거
-3위: (자산명) - 근거
-4위: (자산명) - 근거
-5위: (자산명) - 근거
-6위: (자산명) - 근거
-
----
-
-## ⚠️ 4. 뉴스에서 감지되는 잠재 리스크
-잠재적 리스크 4가지 이상을 분석하고, 각 리스크의 발현 가능성과 헤지 방법을 설명하세요.
-
----
-
-## 📅 5. 단기 vs 중기 시장 영향 시나리오
-- 뉴스 영향 확대 시나리오: 조건과 예상 자산 반응
-- 뉴스 영향 제한 시나리오: 조건과 예상 자산 반응
-
----
-
-## 🔮 6. 이번 주 핵심 체크포인트
-이번 주 반드시 확인해야 할 경제 지표, 정책 발표, 기업 이벤트를 안내하고, 각 결과에 따라 어떤 자산이 유리해지는지 설명하세요.`;
-    }
-
-    // ✅ gemini-2.5-flash-lite
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 8192,
-        },
-      }),
-      signal: AbortSignal.timeout(60000),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('[AI Insight] Gemini API 오류:', errText);
-      return NextResponse.json({ error: `Gemini API 호출 실패 (${response.status}): ${errText}` }, { status: 500 });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await response.json() as any;
-    const text: string = result?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-
-    if (!text) {
-      return NextResponse.json({ error: '응답 없음 — 잠시 후 다시 시도하세요' }, { status: 500 });
-    }
-
-    return NextResponse.json({ analysis: text, mode, generatedAt: new Date().toISOString() });
+    const requestedCategories: string[] = body?.categories ?? CATEGORIES.map(c => c.id);
+    const targets = CATEGORIES.filter(c => requestedCategories.includes(c.id));
+
+    // 뉴스 병렬 fetch
+    const newsMap = await Promise.all(
+      targets.map(async cat => ({
+        ...cat,
+        headlines: await fetchNewsByCategory(cat.id, baseUrl),
+      }))
+    );
+
+    // Gemini 병렬 요약 (5개 카테고리 동시 처리 → 약 5~10초)
+    const summaries = await Promise.all(
+      newsMap.map(async cat => ({
+        id:        cat.id,
+        label:     cat.label,
+        emoji:     cat.emoji,
+        headlines: cat.headlines,
+        summary:   await summarizeWithGemini(apiKey, cat.label, cat.headlines),
+      }))
+    );
+
+    return NextResponse.json({ summaries, generatedAt: new Date().toISOString() });
 
   } catch (err) {
     console.error('[AI Insight]', err);
