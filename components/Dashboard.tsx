@@ -12,22 +12,31 @@ import { VSASignalPanel } from './VSASignalPanel';
 import { SP500ScanPanel } from './SP500ScanPanel';
 import { NewsPanel } from './NewsPanel';
 import { QuantLabPanel } from './QuantLabPanel';
+import { PortfolioPanel } from './PortfolioPanel';
+import { AlertPanel } from './AlertPanel';
+import { AIInsightPanel } from './AIInsightPanel';
 import { useQuotes, useCorrelation } from '@/hooks/useAssetData';
 import { formatDatetime } from '@/lib/utils';
 import { ASSET_IDS, ASSET_META } from '@/lib/constants';
 import type { AssetId, Period, RollingWindow } from '@/lib/types';
 
-type TabId = 'overview' | 'tradingview' | 'vsa' | 'sp500scan' | 'quantlab' | 'correlation' | 'news' | 'table';
+type TabId =
+  | 'overview' | 'tradingview' | 'vsa' | 'sp500scan'
+  | 'quantlab' | 'portfolio' | 'alerts' | 'ai'
+  | 'correlation' | 'news' | 'table';
 
-const TABS: Array<{ id: TabId; label: string; emoji: string }> = [
-  { id: 'overview',    label: '개요',      emoji: '◈'  },
-  { id: 'tradingview', label: 'TV 차트',   emoji: '📊' },
-  { id: 'vsa',         label: 'VSA 분석',  emoji: '⚡' },
-  { id: 'sp500scan',   label: 'S&P 스캔',  emoji: '🔍' },
-  { id: 'quantlab',    label: '퀀트 랩',   emoji: '⚗️' },
-  { id: 'correlation', label: '상관관계',  emoji: '🔗' },
-  { id: 'news',        label: '뉴스',      emoji: '📰' },
-  { id: 'table',       label: '데이터',    emoji: '≡'  },
+const TABS: Array<{ id: TabId; label: string; emoji: string; group?: string }> = [
+  { id: 'overview',    label: '개요',       emoji: '◈',  group: '분석' },
+  { id: 'tradingview', label: 'TV 차트',    emoji: '📊', group: '분석' },
+  { id: 'vsa',         label: 'VSA 분석',   emoji: '⚡', group: '분석' },
+  { id: 'sp500scan',   label: 'S&P 스캔',   emoji: '🔍', group: '분석' },
+  { id: 'quantlab',    label: '퀀트 랩',    emoji: '⚗️', group: '전략' },
+  { id: 'portfolio',   label: '포트폴리오', emoji: '💼', group: '자산' },
+  { id: 'alerts',      label: '알림',       emoji: '🔔', group: '자산' },
+  { id: 'ai',          label: 'AI 분석',    emoji: '🤖', group: 'AI'   },
+  { id: 'correlation', label: '상관관계',   emoji: '🔗', group: '데이터' },
+  { id: 'news',        label: '뉴스',       emoji: '📰', group: '데이터' },
+  { id: 'table',       label: '데이터',     emoji: '≡',  group: '데이터' },
 ];
 
 export function Dashboard() {
@@ -71,8 +80,7 @@ export function Dashboard() {
                     <circle cx="12" cy="12" r="10" fill="none" stroke="#1e2d4a" strokeWidth="2" />
                     <circle cx="12" cy="12" r="10" fill="none" stroke="#00d4ff" strokeWidth="2"
                       strokeDasharray={`${62.8 * (countdown / 60)} 62.8`}
-                      className="transition-all duration-1000"
-                    />
+                      className="transition-all duration-1000" />
                   </svg>
                 </div>
                 <span className="text-[10px] font-mono text-[#4a6080]">{countdown}초</span>
@@ -97,9 +105,12 @@ export function Dashboard() {
           <div className="flex gap-0 ml-10 lg:ml-0 min-w-max px-2 lg:px-4">
             {TABS.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-3 text-xs font-semibold border-b-2 transition-all duration-150 whitespace-nowrap
-                  ${activeTab === tab.id ? 'border-[#00d4ff] text-[#00d4ff]' : 'border-transparent text-[#4a6080] hover:text-[#c8d8f0]'}`}>
-                <span className="text-xs">{tab.emoji}</span>
+                className={`flex items-center gap-1.5 px-3 py-3 text-xs font-semibold border-b-2 transition-all duration-150 whitespace-nowrap
+                  ${activeTab === tab.id ? 'border-[#00d4ff] text-[#00d4ff]' : 'border-transparent text-[#4a6080] hover:text-[#c8d8f0]'}
+                  ${tab.id === 'portfolio' ? 'border-l border-[#1e2d4a] ml-2 pl-4' : ''}
+                  ${tab.id === 'correlation' ? 'border-l border-[#1e2d4a] ml-2 pl-4' : ''}
+                `}>
+                <span>{tab.emoji}</span>
                 {tab.label}
               </button>
             ))}
@@ -122,49 +133,55 @@ export function Dashboard() {
                 </div>
               </section>
 
-              <div className="grid lg:grid-cols-3 gap-5">
-                <div className="lg:col-span-1 bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className="text-xs font-bold text-[#e8f0ff]">상관관계 히트맵</h2>
-                      <p className="text-[10px] text-[#4a6080] font-mono mt-0.5">{period} / {rollingWindow}일 윈도우</p>
-                    </div>
+              <div className="grid lg:grid-cols-4 gap-4">
+                {/* 상관관계 */}
+                <div className="lg:col-span-1 bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xs font-bold text-[#e8f0ff]">상관관계</h2>
                     <button onClick={() => setActiveTab('correlation')} className="text-[10px] text-[#00d4ff] hover:underline font-mono">자세히 →</button>
                   </div>
-                  {cLoading || !correlationMatrix ? <div className="h-72 bg-[#0a0e1a] rounded animate-pulse" /> : <CorrelationHeatmap matrix={correlationMatrix} />}
+                  {cLoading || !correlationMatrix ? <div className="h-60 bg-[#0a0e1a] rounded animate-pulse" /> : <CorrelationHeatmap matrix={correlationMatrix} />}
                 </div>
-                <div className="lg:col-span-1 bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
-                  <div className="flex items-center justify-between mb-4">
+                {/* 인사이트 */}
+                <div className="lg:col-span-1 bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-4">
+                  <div className="flex items-center justify-between mb-3">
                     <h2 className="text-xs font-bold text-[#e8f0ff]">자동 인사이트</h2>
-                    <button onClick={() => setActiveTab('correlation')} className="text-[10px] text-[#00d4ff] hover:underline font-mono">전체 →</button>
+                    <button onClick={() => setActiveTab('ai')} className="text-[10px] text-[#b48eff] hover:underline font-mono">AI 분석 →</button>
                   </div>
                   <InsightPanel insights={insights} loading={cLoading} />
                 </div>
-                {/* 퀀트 랩 미리보기 */}
-                <div className="lg:col-span-1 bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
-                  <div className="flex items-center justify-between mb-4">
+                {/* 퀀트 랩 바로가기 */}
+                <div className="lg:col-span-1 bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-4">
+                  <div className="flex items-center justify-between mb-3">
                     <h2 className="text-xs font-bold text-[#e8f0ff]">⚗️ 퀀트 랩</h2>
                     <button onClick={() => setActiveTab('quantlab')} className="text-[10px] text-[#00ffcc] hover:underline font-mono">열기 →</button>
                   </div>
-                  <div className="space-y-1.5">
-                    {[
-                      { name: 'RSI 역추세',    color: '#00d4ff' },
-                      { name: 'BB 역추세',     color: '#ffb800' },
-                      { name: 'MA 골든크로스', color: '#00ff88' },
-                      { name: 'MACD 크로스',   color: '#b48eff' },
-                      { name: 'VSA 거래량',    color: '#ff4466' },
-                      { name: '가격 모멘텀',   color: '#ff8c00' },
-                      { name: '멀티팩터 ⭐',   color: '#00ffcc' },
-                    ].map(s => (
-                      <div key={s.name}
-                        className="flex items-center gap-2 p-2 rounded bg-[#0a0e1a] border border-[#1e2d4a] cursor-pointer hover:border-[#2a3d5a] transition-colors"
-                        onClick={() => setActiveTab('quantlab')}
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                        <span className="text-[10px] font-mono text-[#c8d8f0]">{s.name}</span>
+                  <div className="space-y-1">
+                    {['RSI 역추세', 'BB 역추세', 'MA 골든크로스', 'MACD 크로스', 'VSA 거래량', '가격 모멘텀', '멀티팩터 ⭐'].map(s => (
+                      <div key={s} onClick={() => setActiveTab('quantlab')}
+                        className="flex items-center gap-2 p-1.5 rounded bg-[#0a0e1a] border border-[#1e2d4a] cursor-pointer hover:border-[#2a3d5a] transition-colors">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#00ffcc] shrink-0" />
+                        <span className="text-[10px] font-mono text-[#c8d8f0]">{s}</span>
                       </div>
                     ))}
                   </div>
+                </div>
+                {/* 신기능 바로가기 */}
+                <div className="lg:col-span-1 bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-4 space-y-3">
+                  {[
+                    { tab: 'portfolio' as TabId, emoji: '💼', title: '포트폴리오', desc: '보유 자산 실시간 손익', color: '#00ff88' },
+                    { tab: 'alerts'    as TabId, emoji: '🔔', title: '알림 시스템', desc: '조건 충족 시 자동 알림', color: '#ffb800' },
+                    { tab: 'ai'        as TabId, emoji: '🤖', title: 'AI 분석',    desc: 'Claude 시장 인사이트',  color: '#b48eff' },
+                  ].map(item => (
+                    <div key={item.tab} onClick={() => setActiveTab(item.tab)}
+                      className="p-3 rounded-lg bg-[#0a0e1a] border border-[#1e2d4a] cursor-pointer hover:border-[#2a3d5a] transition-colors">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span>{item.emoji}</span>
+                        <span className="text-xs font-bold font-mono" style={{ color: item.color }}>{item.title}</span>
+                      </div>
+                      <p className="text-[10px] text-[#4a6080]">{item.desc}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -194,7 +211,7 @@ export function Dashboard() {
                   <h2 className="text-xs font-bold text-[#e8f0ff] mb-4">분석 방법론</h2>
                   <div className="space-y-3 text-[11px] text-[#c8d8f0] leading-relaxed">
                     {[
-                      { color: '#ffb800', title: '📐 RSI 계산 방식', body: "Wilder's Smoothing Method 적용 (기간: 14주봉)." },
+                      { color: '#ffb800', title: '📐 RSI 계산 방식', body: "Wilder's Smoothing Method (기간: 14주봉)." },
                       { color: '#00ff88', title: '📊 거래량 기준', body: '최근 20주 평균 대비 1.5배(강), 2.0배(극단) 구분.' },
                       { color: '#00d4ff', title: '🎯 시그널 해석', body: 'RSI 과매도 + 대량 거래량 = 스마트머니 개입 가능성.' },
                     ].map(item => (
@@ -231,6 +248,33 @@ export function Dashboard() {
             </div>
           )}
 
+          {/* ═══ PORTFOLIO ════════════════════════════════════════════════ */}
+          {activeTab === 'portfolio' && (
+            <div className="animate-fadeIn">
+              <section className="bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
+                <PortfolioPanel />
+              </section>
+            </div>
+          )}
+
+          {/* ═══ ALERTS ═══════════════════════════════════════════════════ */}
+          {activeTab === 'alerts' && (
+            <div className="animate-fadeIn">
+              <section className="bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
+                <AlertPanel />
+              </section>
+            </div>
+          )}
+
+          {/* ═══ AI INSIGHT ═══════════════════════════════════════════════ */}
+          {activeTab === 'ai' && (
+            <div className="animate-fadeIn">
+              <section className="bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
+                <AIInsightPanel />
+              </section>
+            </div>
+          )}
+
           {/* ═══ CORRELATION ══════════════════════════════════════════════ */}
           {activeTab === 'correlation' && (
             <div className="space-y-5 animate-fadeIn">
@@ -238,7 +282,7 @@ export function Dashboard() {
                 <section className="lg:col-span-3 bg-[#0f1628] rounded-xl border border-[#1e2d4a] p-5">
                   <div className="mb-4">
                     <h2 className="text-xs font-bold text-[#e8f0ff]">자산 간 상관관계 매트릭스</h2>
-                    <p className="text-[10px] text-[#4a6080] font-mono mt-0.5">기간: {period} | 롤링 윈도우: {rollingWindow}일 | 피어슨 상관계수</p>
+                    <p className="text-[10px] text-[#4a6080] font-mono mt-0.5">기간: {period} | 롤링 윈도우: {rollingWindow}일</p>
                   </div>
                   {cLoading || !correlationMatrix ? <div className="h-72 bg-[#0a0e1a] rounded animate-pulse" /> : <CorrelationHeatmap matrix={correlationMatrix} />}
                 </section>
@@ -286,7 +330,7 @@ export function Dashboard() {
                     <p className="text-[10px] text-[#4a6080] font-mono mt-0.5">Yahoo Finance + 보조 API · 60초 자동 갱신</p>
                   </div>
                   <div className="hidden sm:flex items-center gap-3 text-[10px] font-mono">
-                    {[['#00ff88','Yahoo'],['#ffb800','보조API'],['#ff4466','Fallback']].map(([c,l]) => (
+                    {[['#00ff88', 'Yahoo'], ['#ffb800', '보조API'], ['#ff4466', 'Fallback']].map(([c, l]) => (
                       <div key={l} className="flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c }} />
                         <span className="text-[#4a6080]">{l}</span>
